@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "488376797630",
+    "project_id": "onesignalnotification-f8a0f",
+    "storage_bucket": "onesignalnotification-f8a0f.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:488376797630:android:7cbbddb109fba69c76d1ef",
+        "android_client_info": {
+          "package_name": "com.app.uhuru"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6fNeYdmF6VT1uH0aEA1aR2zLcorwLkSY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
