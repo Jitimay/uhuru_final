@@ -2,10 +2,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:story_view/controller/story_controller.dart';
-import 'package:story_view/widgets/story_view.dart';
 import 'package:uhuru/screens/story/screens/story_display.dart';
 import 'package:video_editor/video_editor.dart';
 import 'package:path_provider/path_provider.dart';
@@ -40,7 +37,7 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
   bool isUploading = false;
   bool isPlaying = false;
   String? processingStatus;
-  String text = ""; // Define the text variable to store text-only story content
+  String text = "";
 
   @override
   void initState() {
@@ -130,20 +127,12 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
 
   Future<void> addStory(String mediaPath, String caption, String visibility, BuildContext context) async {
     try {
-      String message;
-      if (Variables.isVideo) {
-        message = "Uploading video...";
-      } else if (Variables.isImage) {
-        message = "Uploading image...";
-      } else {
-        message = "Uploading text...";
-      }
-
-      Fluttertoast.showToast(
-        msg: message,
-        backgroundColor: Colors.teal,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Uploading your story..."),
+          duration: const Duration(seconds:2),
+        ),
       );
-
       var response;
 
       if (mediaPath == 'null' && caption.isNotEmpty) {
@@ -151,46 +140,38 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
       } else {
         if (Variables.isVideo) {
           final trimmedVideo = await exportTrimmedVideo();
-
-          // Ensure trimmedVideo is not null before proceeding
-          if (trimmedVideo == null) {
-            Fluttertoast.showToast(
-              msg: "Error: Could not prepare video for upload",
-              backgroundColor: Colors.red,
-            );
-            return;
+          if (trimmedVideo != null && await File(trimmedVideo).exists()) {
+            mediaPath = trimmedVideo;
+          } else {
+            throw Exception("Failed to trim video");
           }
-
-          mediaPath = trimmedVideo;
         }
-
         response = await _addStoryApi.addStoryApi(mediaPath, caption, visibility);
       }
 
       if (response != null) {
         await getStory();
+        Navigator.pop(context); // Close loader
+        showSnackBar(content: "Story uploaded successfully", context: context);
 
-        Fluttertoast.showToast(
-          msg: "Story uploaded successfully",
-          backgroundColor: Colors.green,
-        );
-
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (context) => StoryDisplay(
-            buildStoryItems: <StoryItem>[],  // Adjust with your story item list
-            views: 0,
-            statusId: response['statusId'].toString(),
+        Navigator.pushReplacement(context,
+          MaterialPageRoute(
+            builder: (context)=> StoryDisplay(
+              buildStoryItems: [], views: 0,
+              statusId: response['statusID'],
+            ),
           ),
-        ));
+        );
       }
     } catch (e) {
-      Fluttertoast.showToast(
-        msg: "Failed to upload story: ${e.toString()}",
-        backgroundColor: Colors.red,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to Upload story: ${e.toString()}"),
+          backgroundColor: Colors.blue,
+          duration: const Duration(seconds: 3),
+        ),
       );
     }
   }
-
 
   Future<void> getStory() async {
     try {
@@ -275,12 +256,64 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
         ),
       ),
       body: SafeArea(
-        child: Column(
+        child: Variables.isVideo
+            ? Column(
           children: [
             Expanded(
-              child: Variables.isVideo
-                  ? _buildVideoPreview()
-                  : Variables.isImage
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  _buildVideoPreview(),
+                  if (isProcessing)
+                    Container(
+                      color: Colors.black54,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(color: Colors.white),
+                            const SizedBox(height: 16),
+                            Text(
+                              processingStatus ?? "Processing...",
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            _buildTrimSlider(),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _captionController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Add a caption...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.white),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        )
+            : Column(
+          children: [
+            Expanded(
+              child: Variables.isImage
                   ? Image.file(File(widget.file!.files.single.path!))
                   : Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -295,30 +328,30 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
                 ),
               ),
             ),
-            if (Variables.isVideo || Variables.isImage)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _captionController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Add a caption...',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Colors.white),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Colors.white),
-                    ),
+            // Add a new TextField for image caption
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _captionController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Add a caption...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.white),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.white),
                   ),
                 ),
               ),
+            ),
           ],
         ),
       ),
