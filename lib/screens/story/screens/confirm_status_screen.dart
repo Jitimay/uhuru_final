@@ -14,6 +14,7 @@ import '../../../common/utils/loader_dialog.dart';
 import '../../../common/utils/utils.dart';
 import '../../../common/utils/variables.dart';
 import '../api/add_story.dart';
+import '../api/add_story_view.dart';
 import '../api/get_story.dart';
 import '../model/group_status_by_phone_number.dart';
 
@@ -31,6 +32,7 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
   late VideoEditorController? _controller;
   final _addStoryApi = Get.put(AddStory());
   final _getStoryApi = Get.put(GetStory());
+  final _addStoryViewApi = Get.put(AddStoryView());
   final TextEditingController _captionController = TextEditingController();
 
   bool isProcessing = false;
@@ -151,9 +153,8 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
 
       if (response != null) {
         await getStory();
-        Navigator.pop(context); // Close loader
+        Navigator.pop(context);
         showSnackBar(content: "Story uploaded successfully", context: context);
-
         Navigator.pushReplacement(context,
           MaterialPageRoute(
             builder: (context)=> StoryDisplay(

@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:uhuru/screens/story/utils/comment_status_widget.dart';
+import 'package:uhuru/screens/story/screens/status_update_widget.dart';
 
-class StroryWidget extends StatelessWidget {
+
+class StoryWidget extends StatelessWidget {
   final String content;
   final String status;
-  const StroryWidget({super.key,required this.content,required this.status});
+  final String mediaUrl;
+  final String mediaType;
+  final Duration? videoDuration;
+  final String time;
+
+  const StoryWidget({
+    super.key,
+    required this.content,
+    required this.status,
+    required this.mediaUrl,
+    required this.mediaType,
+    this.videoDuration,
+    required this.time,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -14,10 +28,11 @@ class StroryWidget extends StatelessWidget {
           Center(
             child: StatusUpdateWidget(
               chatName: 'You • ${status}',
-              isMe: content,
-              thumbnailUrl: 'https://example.com/thumbnail.jpg',
-              videoDuration: Duration(seconds: 57),
-              time: '15:02',
+              content: content,
+              thumbnailUrl: mediaUrl,
+              videoDuration: videoDuration ?? Duration.zero,
+              time: time,
+              mediaType: mediaType,
             ),
           ),
         ],
@@ -25,4 +40,3 @@ class StroryWidget extends StatelessWidget {
     );
   }
 }
-

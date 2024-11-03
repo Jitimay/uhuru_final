@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:intl/intl.dart';
 import 'package:story_view/controller/story_controller.dart';
 import 'package:story_view/utils.dart';
 import 'package:story_view/widgets/story_view.dart';
@@ -16,31 +17,42 @@ import '../../chats/data/isar/chat_collection.dart';
 import '../../messages/bloc/message_bloc.dart';
 import '../../messages/data/api/messages_api.dart';
 import '../../messages/data/model/message_model.dart';
+import '../api/add_story_view.dart';
 import '../api/delete_post.dart';
 
 class StoryDisplay extends StatefulWidget {
   final List<StoryItem> buildStoryItems;
-  final int views;     
-  final String? statusId; 
+  final int views;
+  final String? statusId;
+  final String? mediaUrl;
+  final String? mediaType;
+  final String? videoDuration;
 
   StoryDisplay({
     Key? key,
     required this.buildStoryItems,
-    required this.views,   // Ensure views is required and typed
-    this.statusId,         // statusId to identify which status to delete
+    required this.views,
+    this.statusId,
+    this.mediaType,
+    this.mediaUrl,
+    this.videoDuration,
   }) : super(key: key);
 
   @override
   _StoryDisplayState createState() => _StoryDisplayState();
 }
 
-
 class _StoryDisplayState extends State<StoryDisplay> {
   final DeleteStatus _deleteStatus = DeleteStatus();
   StoryController controller = StoryController();
   final TextEditingController _commentController = TextEditingController();
-  final DeleteStatus _deleteStory = DeleteStatus();  // Initialize DeleteStory
- 
+  final _addStoryViewApi = Get.put(AddStoryView());
+  Set<int> _viewedStoryIndices = {};
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   // Delete status method
   Future<void> _handleDeleteStatus() async {
@@ -53,7 +65,6 @@ class _StoryDisplayState extends State<StoryDisplay> {
     }
 
     try {
-      // Show confirmation dialog
       bool? shouldDelete = await showDialog<bool>(
         context: context,
         builder: (BuildContext context) {
@@ -75,7 +86,6 @@ class _StoryDisplayState extends State<StoryDisplay> {
       );
 
       if (shouldDelete == true) {
-        // Show loading indicator
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -84,11 +94,9 @@ class _StoryDisplayState extends State<StoryDisplay> {
           },
         );
 
-        // Parse statusId as integer for DeleteStatus
         final int statusId = int.parse(widget.statusId!);
         final bool success = await _deleteStatus.deleteStatusApi(statusId);
 
-        // Pop loading indicator
         Navigator.pop(context);
 
         if (success) {
@@ -96,10 +104,9 @@ class _StoryDisplayState extends State<StoryDisplay> {
             msg: "Status deleted successfully",
             backgroundColor: Colors.green,
           );
-          // Pop twice to go back to the previous screen
           Navigator.of(context)
-            ..pop() // Pop the StatusDisplay screen
-            ..pop(); // Pop to the previous screen
+            ..pop()
+            ..pop();
         } else {
           Fluttertoast.showToast(
             msg: "Failed to delete status",
@@ -108,7 +115,7 @@ class _StoryDisplayState extends State<StoryDisplay> {
         }
       }
     } catch (e) {
-      Navigator.pop(context); // Pop loading indicator if there's an error
+      Navigator.pop(context);
       Fluttertoast.showToast(
         msg: "Error deleting status: ${e.toString()}",
         backgroundColor: Colors.red,
@@ -125,16 +132,14 @@ class _StoryDisplayState extends State<StoryDisplay> {
   }) async {
     String newMessage;
     final isContainingEmoji = UtilsFx().containsEmoji(content);
-    if (isContainingEmoji) {
-      newMessage = UtilsFx().convertToUnicode(content);
-    } else {
-      newMessage = content;
-    }
+    newMessage = isContainingEmoji
+        ? UtilsFx().convertToUnicode(content)
+        : content;
 
     final time = DateTime.now();
     final stringNow = Variables.dateMessageFormat.format(time);
     final _now = DateTime.parse(stringNow);
-    debugPrint('Before $_now');
+
     final message = MessageModel(
       chatId: chatName,
       messageId: null,
@@ -162,6 +167,7 @@ class _StoryDisplayState extends State<StoryDisplay> {
         ),
       );
     }
+
     Map<String, dynamic> lastMessageInfo = {
       'chatId': chatName,
       'content': content,
@@ -174,72 +180,78 @@ class _StoryDisplayState extends State<StoryDisplay> {
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.bodyMedium;
-    final iconColor = Theme.of(context).colorScheme.onBackground;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SizedBox(
         height: MediaQuery.of(context).size.height,
         child: Stack(
           children: [
+            // StoryView setup
             SizedBox(
               height: MediaQuery.of(context).size.height / 1.05,
               child: StoryView(
-                  storyItems: widget.buildStoryItems,
-                  controller: controller,
-                  repeat: false,
-                  onComplete: () {
+                storyItems: widget.buildStoryItems,
+                controller: controller,
+                repeat: false,
+                onComplete: () {
+                  setState(() {
+                    Variables.ownStoryViewing = false;
+                    Variables.viewingFriendsStory = false;
+                  });
+                  Navigator.pop(context);
+                },
+                onStoryShow: (storyItem, index) {
+                  setState(() {
+                    _viewedStoryIndices.add(index);
+                  });
+                  debugPrint("Showing story at index $index");
+                },
+                onVerticalSwipeComplete: (direction) {
+                  if (direction == Direction.down) {
                     setState(() {
-                      Variables.ownStoryViewing = false;
                       Variables.viewingFriendsStory = false;
                     });
                     Navigator.pop(context);
-                  },
-                  onStoryShow: (s, i) {
-                     //final currentStory = widget.buildStoryItems[i]; 
-                    debugPrint("Showing a story ==========${StoryItem.text}========");
-                  },
-                  onVerticalSwipeComplete: (direction) {
-                    if (direction == Direction.down) {
-                      setState(() {
-                        Variables.viewingFriendsStory = false;
-                      });
-                      Navigator.pop(context);
-                    }
-                  }),
-            ),
-            Visibility(
-              visible: Variables.ownStoryViewing,
-              child: Positioned(
-                bottom: 0.0,
-                left: MediaQuery.of(context).size.width / 2.5,
-                child: TextButton(
-                  onPressed: () {},
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.remove_red_eye_outlined,
-                        color: Colors.white,
-                      ),
-                      Text(
-                        '${widget.views}',
-                        style: textStyle!.copyWith(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
-                      )
-                    ],
-                  ),
-                ),
+                  }
+                },
               ),
             ),
+            // Show view count only on viewed story items for the user's own story
+            for (int i = 0; i < widget.buildStoryItems.length; i++)
+              if (_viewedStoryIndices.contains(i) && Variables.ownStoryViewing)
+                Positioned(
+                  bottom: 0.0,
+                  left: MediaQuery.of(context).size.width / 2.5,
+                  child: TextButton(
+                    onPressed: () {},
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.remove_red_eye_outlined,
+                          color: Colors.white,
+                        ),
+                        Text(
+                          '${widget.views}',
+                          style: textStyle!.copyWith(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            // Delete button for user's own story
             if (Variables.ownStoryViewing)
               Positioned(
                 top: 50,
                 right: 20,
                 child: IconButton(
                   icon: Icon(Icons.delete, color: Colors.red),
-                  onPressed: _handleDeleteStatus,  // Add the delete handler
+                  onPressed: _handleDeleteStatus,
                 ),
               ),
+            // Reply section for viewing other users' stories
             Visibility(
-              visible: Variables.ownStoryViewing ? false : true,
+              visible: !Variables.ownStoryViewing,
               child: Positioned(
                 bottom: 2.0,
                 child: Row(
@@ -251,42 +263,68 @@ class _StoryDisplayState extends State<StoryDisplay> {
                         margin: EdgeInsets.only(left: 20.0),
                         decoration: BoxDecoration(color: Colors.white54, borderRadius: BorderRadius.circular(25.0)),
                         child: Container(
-                          margin: EdgeInsets.only(left: 10.0, right: 10.0),
+                          margin: EdgeInsets.symmetric(horizontal: 10.0),
                           child: TextFormField(
                             controller: _commentController,
                             decoration: InputDecoration(
-                                hintText: 'Reply',
-                                hintStyle: textStyle!.copyWith(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
-                                enabledBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: messageColor),
-                                ),
-                                focusedBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: messageColor),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderSide: BorderSide.none,
-                                ),
-                                suffixIcon: IconButton(
-                                  onPressed: () {
-                                    String content = _commentController.text;
-                                    submitMessageText(
-                                        chatName: Variables.replyChat,
-                                        isMe: true,
-                                        content: content,
-                                        contentType: Variables.isImage
-                                            ? 'image'
-                                            : Variables.isVideo
-                                            ? 'video'
-                                            : 'text');
-                                    FocusScope.of(context).unfocus();
-                                    _commentController.clear();
-                                    Fluttertoast.showToast(msg: "Sending reply...", toastLength: Toast.LENGTH_SHORT, gravity: ToastGravity.BOTTOM, timeInSecForIosWeb: 1, backgroundColor: Colors.teal);
-                                    controller.play();
+                              hintText: 'Reply',
+                              hintStyle: textStyle!.copyWith(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                              enabledBorder: UnderlineInputBorder(
+                                borderSide: BorderSide(color: messageColor),
+                              ),
+                              focusedBorder: UnderlineInputBorder(
+                                borderSide: BorderSide(color: messageColor),
+                              ),
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide.none,
+                              ),
+                              suffixIcon: IconButton(
+                                onPressed: () {
+                                  final time = DateTime.now();
+                                  final formattedTime = DateFormat('HH:mm').format(time);
+                                  String content = _commentController.text;
+                                  submitMessageText(
+                                      chatName: Variables.replyChat,
+                                      isMe: true,
+                                      content: content,
+                                      contentType: Variables.isImage
+                                          ? 'image'
+                                          : Variables.isVideo
+                                          ? 'video'
+                                          : 'text');
+                                  FocusScope.of(context).unfocus();
+                                  _commentController.clear();
+                                  Fluttertoast.showToast(msg: "Sending reply...", toastLength: Toast.LENGTH_SHORT, gravity: ToastGravity.BOTTOM, backgroundColor: Colors.teal);
+                                  controller.play();
 
-                                    Navigator.of(context).push(MaterialPageRoute(builder: (ctx)=>StroryWidget(content: content,status: 'Status',)));
-                                  },
-                                  icon: Icon(Icons.send, color: Colors.white),
-                                )),
+                                  Duration? videoDuration;
+                                  if (widget.videoDuration != null && widget.videoDuration is String) {
+                                    final parts = (widget.videoDuration as String).split(':');
+                                    if (parts.length == 2) {
+                                      final minutes = int.tryParse(parts[0]) ?? 0;
+                                      final seconds = int.tryParse(parts[1]) ?? 0;
+                                      videoDuration = Duration(minutes: minutes, seconds: seconds);
+                                    }
+                                  } else if (widget.videoDuration is Duration) {
+                                    videoDuration = widget.videoDuration as Duration;
+                                  }
+
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (ctx) => StoryWidget(
+                                        content: content,
+                                        status: 'Status',
+                                        mediaUrl: widget.mediaUrl ?? '',
+                                        mediaType: widget.mediaType ?? 'text',
+                                        videoDuration: videoDuration,
+                                        time: formattedTime,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: Icon(Icons.send, color: Colors.white),
+                              ),
+                            ),
                             style: textStyle!.copyWith(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
                             onTap: () {
                               controller.pause();
@@ -298,7 +336,7 @@ class _StoryDisplayState extends State<StoryDisplay> {
                           ),
                         ),
                       ),
-                    )
+                    ),
                   ],
                 ),
               ),

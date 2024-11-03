@@ -61,7 +61,7 @@ class UpdatesScreen extends StatelessWidget {
           ),
           GestureDetector(
             onTap: () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => StroryWidget(content: "Test", status: "Online",)));
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => StoryWidget(content: "Test", status: "online", mediaUrl: "josh.com", mediaType: "Test", time: "007")));
             },
             child: ListTile(
               title: Text('Story widget '),
