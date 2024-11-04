@@ -90,7 +90,7 @@ class _StoryDisplayState extends State<StoryDisplay> {
       );
 
       if (shouldDelete == true) {
-        // Show loading indicator
+        
         showDialog(
           context: context,
           barrierDismissible: false,
