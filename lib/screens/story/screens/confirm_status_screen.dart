@@ -129,14 +129,17 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
 
   Future<void> addStory(String mediaPath, String caption, String visibility, BuildContext context) async {
     try {
+      // Show a popup indicating the upload process
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Uploading your story..."),
-          duration: const Duration(seconds:2),
+          duration: const Duration(seconds: 2),
         ),
       );
+
       var response;
 
+      // Handle story upload logic
       if (mediaPath == 'null' && caption.isNotEmpty) {
         response = await _addStoryApi.addStoryTextApi('null', caption, visibility);
       } else {
@@ -152,27 +155,40 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
       }
 
       if (response != null) {
-        await getStory();
-        Navigator.pop(context);
+        await getStory(); // Fetch latest stories
+
+        // Close the current popup
+        if (mounted) {
+          Navigator.pop(context); // Ensures the current screen is still mounted
+        }
+
+        // Directly navigate to StoryDisplay page
+        // if (mounted) {
+        //   Navigator.pushReplacement(
+        //     context,
+        //     MaterialPageRoute(
+        //       builder: (context) => StoryDisplay(
+        //         buildStoryItems: [],
+        //         statusId: response['statusID'],
+        //         views: 0,
+        //       ),
+        //     ),
+        //   );
+        // }
+
         showSnackBar(content: "Story uploaded successfully", context: context);
-        Navigator.pushReplacement(context,
-          MaterialPageRoute(
-            builder: (context)=> StoryDisplay(
-              buildStoryItems: [], views: 0,
-              statusId: response['statusID'],
-            ),
-          ),
-        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to Upload story: ${e.toString()}"),
+        SnackBar(
+          content: Text("Failed to Upload story: ${e.toString()}"),
           backgroundColor: Colors.blue,
           duration: const Duration(seconds: 3),
         ),
       );
     }
   }
+
 
   Future<void> getStory() async {
     try {
@@ -360,7 +376,9 @@ class _ConfirmStatusScreenState extends ConsumerState<ConfirmStatusScreen> {
         backgroundColor: floatingBtnColor,
         onPressed: () async {
           final mediaPath = widget.file != null ? widget.file!.files.single.path! : 'null';
-          final caption = _captionController.text.isNotEmpty ? _captionController.text : text;
+          final caption = Variables.isImage || Variables.isVideo
+              ? _captionController.text
+              : text;
           await addStory(mediaPath, caption, 'friends', context);
         },
         child: Icon(Icons.done, color: primaryColor),

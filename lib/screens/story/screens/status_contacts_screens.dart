@@ -23,6 +23,7 @@ import '../../../common/utils/utils.dart';
 import '../../../common/utils/variables.dart';
 import '../api/get_story.dart';
 import '../model/group_status_by_phone_number.dart';
+import 'customer_story.dart';
 
 class StatusContactScreens extends StatefulWidget {
   const StatusContactScreens({super.key});
@@ -157,12 +158,13 @@ class _StatusContactScreensState extends State<StatusContactScreens> {
                                 setState(() {
                                   Variables.ownStoryViewing = true;
                                 });
-                                final storyItemsFuture = OwnerStoryItems();
+                                // final storyItemsFuture = OwnerStoryItems();
+                                final storyItemsFuture = CustomOwnerStoryItems();
                                 final statusId = Variables.ownStoryList[0]['id'].toString();
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => FutureBuilder<List<StoryItem>>(
+                                    builder: (context) => FutureBuilder<List<CustomStoryItem>>(
                                       future: storyItemsFuture,
                                       builder: (context, snapshot) {
                                         if (snapshot.connectionState == ConnectionState.done) {
@@ -173,7 +175,8 @@ class _StatusContactScreensState extends State<StatusContactScreens> {
                                           }
                                           final storyItems = snapshot.data!;
                                           return StoryDisplay(
-                                            buildStoryItems: storyItems,
+                                            buildCustomStoryItems: storyItems,
+                                            buildStoryItems: [],
                                             views: Variables.storyViewList.length,
                                             statusId: statusId,
                                           );
@@ -212,7 +215,6 @@ class _StatusContactScreensState extends State<StatusContactScreens> {
                           ),
                   ),
                   Positioned(top: 100.0, left: 10.0, child: Text('Friends Stories')),
-
                   ///FRIENDS STORIES
                   Padding(
                     padding: EdgeInsets.only(top: 130),
@@ -256,12 +258,12 @@ class _StatusContactScreensState extends State<StatusContactScreens> {
                                   });
                                   // final storyItems = friendsStoryItems();
                                   // Navigator.push(context, MaterialPageRoute(builder: (context) => StoryDisplay(buildStoryItems: storyItems)));
-                                  final storyItemsFuture = friendsStoryItems();
+                                  final storyItemsFuture = customFriendsStoryItems();
                                   final statusId = Variables.storyGroupedByPhone[index]['value'][0]['id'].toString();
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => FutureBuilder<List<StoryItem>>(
+                                      builder: (context) => FutureBuilder<List<CustomStoryItem>>(
                                         future: storyItemsFuture,
                                         builder: (context, snapshot) {
                                           if (snapshot.connectionState == ConnectionState.done) {
@@ -270,7 +272,8 @@ class _StatusContactScreensState extends State<StatusContactScreens> {
                                             }
                                             final storyItems = snapshot.data!;
                                             return StoryDisplay(
-                                              buildStoryItems: storyItems,
+                                              buildStoryItems: [],
+                                              buildCustomStoryItems: storyItems,
                                               views: Variables.storyViewList.length,  // Provide views here
                                               statusId: statusId,                     // Provide statusId here
                                             );
@@ -308,8 +311,8 @@ class _StatusContactScreensState extends State<StatusContactScreens> {
     );
   }
 
-  Future<List<StoryItem>> friendsStoryItems() async {
-    final List<StoryItem> storyItems = [];
+  Future<List<CustomStoryItem>> customFriendsStoryItems() async {
+    final List<CustomStoryItem> storyItems = [];
 
     for (final item in Variables.friendsGroupedByPhone) {
       final String itemType = _determineItemType(item);
@@ -321,26 +324,25 @@ class _StatusContactScreensState extends State<StatusContactScreens> {
 
       switch (itemType) {
         case 'text':
-          storyItems.add(StoryItem.text(
+          storyItems.add(CustomStoryItem.text(
             title: itemContent as String, // Assuming 'text' is a String
             backgroundColor: Colors.blueGrey,
-            textStyle: const TextStyle(fontSize: 20.0, decoration: TextDecoration.none, color: Colors.white),
           ));
           break;
         case 'image':
           storyItems.add(
-            StoryItem.pageImage(
-                url: '${itemContent}', // Assuming 'media' is a String
+            CustomStoryItem.image(
+                url: '${itemContent}',
                 controller: controller,
                 caption: Text('${item['text']}')),
           );
           break;
         case 'video':
           final int duration = await getVideoDuration('${itemContent}');
-          storyItems.add(StoryItem.pageVideo('${Environment.urlHost}${itemContent}', controller: controller, duration: Duration(milliseconds: duration), caption: Text('${item['text']}')));
+          storyItems.add(CustomStoryItem.video(controller: controller, duration: Duration(milliseconds: duration), caption: Text('${item['text']}'), url: 'Test'));
           break;
         default:
-          storyItems.add(StoryItem.text(
+          storyItems.add(CustomStoryItem.text(
             title: 'Unknown story item type',
             backgroundColor: Colors.white24,
           ));
@@ -368,6 +370,40 @@ class _StatusContactScreensState extends State<StatusContactScreens> {
       }
     }
     return false;
+  }
+
+
+  Future<List<CustomStoryItem>> CustomOwnerStoryItems() async {
+    final List<CustomStoryItem> customStoryItems = [];
+
+    for (final item in Variables.ownStoryList) {
+      final String itemType = _determineItemType(item);
+      final dynamic itemContent = _determineItemContent(item);
+      setState(() {
+        Variables.storyViewList = item['status_view_friend'];
+      });
+
+      switch (itemType) {
+        case 'text':
+          customStoryItems.add(CustomStoryItem.text(title: itemContent as String, backgroundColor: Colors.blueGrey,),);
+
+          break;
+        case 'image':
+          customStoryItems.add(CustomStoryItem.image(url: '${Environment.urlHost}${itemContent}', controller: controller,caption: Text('${item['text']}')),);
+          break;
+        case 'video':
+          final int duration = await getVideoDuration('${Environment.urlHost}${itemContent}');
+          customStoryItems.add(CustomStoryItem.video(url: '${Environment.urlHost}${itemContent}', controller: controller,duration: Duration(milliseconds: duration),caption: Text('${item['text']}')),);
+
+          break;
+        default:
+          customStoryItems.add(CustomStoryItem.text(title: 'Unknown story item type', backgroundColor: Colors.white24,),);
+
+
+      }
+    }
+
+    return customStoryItems;
   }
 
   Future<List<StoryItem>> OwnerStoryItems() async {
